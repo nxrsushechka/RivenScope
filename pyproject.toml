@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools==80.9.0", "wheel==0.45.1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rivenscope"
+version = "0.1.0"
+description = "Capability-aware Warframe Riven research desktop"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["PySide6>=6.8,<7"]
+
+[project.scripts]
+rivenscope = "rivenscope.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+rivenscope = ["assets/*"]
+
+[tool.setuptools.data-files]
+"share/rivenscope/docs" = ["README.md", "TASKS.md", "docs/API_FEASIBILITY.md", "docs/ARCHITECTURE.md", "docs/INSTALLATION.md", "docs/USER_GUIDE.md", "docs/UPDATING.md", "docs/TEST_REPORT.md", "docs/LIMITATIONS.md", "docs/FINAL_REPORT.md"]
