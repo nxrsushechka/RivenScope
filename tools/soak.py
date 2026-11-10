@@ -25,7 +25,7 @@ def rss():
 
 def main():
     parser=argparse.ArgumentParser(); parser.add_argument("--seconds",type=int,default=180); parser.add_argument("--output",type=Path,required=True)
-    args=parser.parse_args(); root=Path(tempfile.mkdtemp(prefix="rivenscope-soak-",dir="/tmp/opencode"))
+    args=parser.parse_args(); root=Path(tempfile.mkdtemp(prefix="rivenscope-soak-"))
     locations={key:root/key for key in ("data","state","config","cache")}
     for path in locations.values(): path.mkdir()
     db=locations["data"]/"rivenscope.sqlite"; store=Store(db); now=time.time()

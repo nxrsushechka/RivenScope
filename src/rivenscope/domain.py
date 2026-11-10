@@ -5,6 +5,8 @@ import json
 import math
 from urllib.parse import urlsplit
 
+MARKET_PAGE_SIZE = 250
+
 
 def finite(value, name, minimum=None):
     if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
@@ -102,6 +104,10 @@ class Listing:
     @property
     def signature(self):
         return tuple(sorted((a.slug, a.positive) for a in self.attributes))
+
+    @property
+    def comparable_group(self):
+        return (self.weapon, self.category, self.rank, self.disposition, self.measurement, self.signature)
 
     @property
     def fingerprint(self):

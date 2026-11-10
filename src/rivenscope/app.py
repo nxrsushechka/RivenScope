@@ -14,14 +14,15 @@ from .ui.window import MainWindow
 def main(argv=None):
     parser=argparse.ArgumentParser(description="RivenScope — local Warframe Riven research")
     parser.add_argument("--version",action="version",version=__version__)
-    parser.add_argument("--sync",action="store_true",help="Start the documented catalog sync while the window is open")
+    parser.add_argument("--sync",action="store_true",help="Start monitoring using saved settings while the window is open")
     parser.add_argument("--data-dir",type=Path,help="Isolated data directory (diagnostics/testing)")
     parser.add_argument("--smoke-seconds",type=float,default=0,help="Close cleanly after this duration (packaging diagnostics)")
     args=parser.parse_args(argv)
-    locations=paths()
     if args.data_dir:
-        for key in locations:
-            locations[key]=args.data_dir/key; locations[key].mkdir(parents=True,exist_ok=True,mode=0o700)
+        locations={key:args.data_dir/key for key in ("data","state","config","cache")}
+        for path in locations.values(): path.mkdir(parents=True,exist_ok=True,mode=0o700)
+    else:
+        locations=paths()
     configure_logging(locations["state"])
     app=QApplication(sys.argv[:1]); app.setApplicationName("RivenScope"); app.setOrganizationName("RivenScope")
     app.setDesktopFileName("rivenscope")

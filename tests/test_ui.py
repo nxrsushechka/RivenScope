@@ -17,7 +17,7 @@ from .test_integration import APP, wait_for, ControlledTransport, FIXTURES
 
 class UITests(unittest.TestCase):
     def setUp(self):
-        self.temp=tempfile.TemporaryDirectory(prefix="rivenscope-ui-",dir="/tmp/opencode")
+        self.temp=tempfile.TemporaryDirectory(prefix="rivenscope-ui-")
         self.locations={key:Path(self.temp.name)/key for key in ("data","state","config","cache")}
         for path in self.locations.values(): path.mkdir()
         self.db=self.locations["data"]/"rivenscope.sqlite"; store=Store(self.db)
@@ -35,7 +35,7 @@ class UITests(unittest.TestCase):
     def test_navigation_catalog_and_source_truth(self):
         self.assertEqual(self.window.catalog_table.model.rowCount(),420)
         self.assertEqual(self.window.market_table.model.rowCount(),0)
-        self.assertIn("unavailable",self.window.banner.text())
+        self.assertIn("Legacy searches disabled",self.window.banner.text())
         for index in range(6):
             self.window.nav.setCurrentRow(index); APP.processEvents(); self.assertEqual(self.window.stack.currentIndex(),index)
         self.window.nav.setCurrentRow(1)

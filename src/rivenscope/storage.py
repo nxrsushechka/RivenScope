@@ -204,7 +204,9 @@ class Store:
                     state=excluded.state, price=excluded.price, kind=excluded.kind""",
                     (item.id, item.weapon, dumps(payload), item.fingerprint, now, now, item.status, item.acquisition, item.kind))
                 last = self.db.execute("SELECT digest FROM snapshots WHERE listing_id=? ORDER BY id DESC LIMIT 1", (item.id,)).fetchone()
-                if last is None or last[0] != digest:
+                # A locally inferred disappearance changes state, not payload. Its
+                # return must still produce a snapshot/event when the roll is unchanged.
+                if last is None or last[0] != digest or kinds:
                     sid = self.db.execute("INSERT INTO snapshots(listing_id,observed_at,payload,digest) VALUES(?,?,?,?)",
                                           (item.id, now, dumps(payload), digest)).lastrowid
                     if old and not kinds:
@@ -232,7 +234,7 @@ class Store:
 
     def listings(self, limit=10000, offset=0, weapon=""):
         where, params = ("WHERE weapon=?", [weapon]) if weapon else ("", [])
-        rows = self.db.execute(f"SELECT payload,state,first_seen,last_seen FROM listings {where} ORDER BY last_seen DESC LIMIT ? OFFSET ?", (*params, limit, offset))
+        rows = self.db.execute(f"SELECT payload,state,first_seen,last_seen FROM listings {where} ORDER BY last_seen DESC,id LIMIT ? OFFSET ?", (*params, limit, offset))
         result = []
         for row in rows:
             data = json.loads(row[0]); data["status"] = row[1]
@@ -242,6 +244,33 @@ class Store:
     def save_estimate(self, id_, result, now):
         with self.db:
             self.db.execute("INSERT OR REPLACE INTO valuations VALUES(?,?,?)", (id_, now, dumps(asdict(result))))
+
+    def comparables(self, target, now, max_age_hours, limit=10000):
+        """Select comparable asks independently of the visible market page.
+
+        The index narrows to a weapon/time range. Only the latest compatible
+        signed-attribute sets count toward the explicit sample cap.
+        """
+        if target.rank is None or target.disposition is None or not target.measurement or len(target.attributes) < 2:
+            return []
+        rows = self.db.execute("""SELECT payload FROM listings
+            WHERE weapon=? AND state='active' AND kind='direct' AND price>0
+            AND last_seen BETWEEN ? AND ?
+            AND json_extract(payload,'$.category')=?
+            AND json_extract(payload,'$.rank')=?
+            AND json_extract(payload,'$.disposition')=?
+            AND json_extract(payload,'$.measurement')=?
+            ORDER BY last_seen DESC, id""",
+            (target.weapon, now-max_age_hours*3600, now, target.category,
+             target.rank, target.disposition, target.measurement))
+        result = []
+        for row in rows:
+            item = Listing.from_dict(json.loads(row[0]))
+            if item.signature == target.signature:
+                result.append(item)
+                if len(result) >= limit:
+                    break
+        return result
 
     def history(self, id_):
         return {"snapshots": [dict(r) | {"payload": json.loads(r["payload"])} for r in self.db.execute("SELECT * FROM snapshots WHERE listing_id=? ORDER BY observed_at DESC LIMIT 1000", (id_,))],
@@ -265,6 +294,7 @@ class Store:
         counts["new"] = self.db.execute("SELECT COUNT(*) FROM events WHERE kind='new'").fetchone()[0]
         counts["catalog_time"] = self.db.execute("SELECT MAX(fetched_at) FROM catalogs").fetchone()[0]
         counts["last_market_update"] = self.db.execute("SELECT MAX(at) FROM observations").fetchone()[0]
+        counts["searched_weapons"] = self.db.execute("SELECT COUNT(DISTINCT weapon) FROM observations WHERE weapon!=''").fetchone()[0]
         counts["requests"] = [dict(r) for r in self.db.execute("SELECT * FROM request_log ORDER BY id DESC LIMIT 100")]
         return counts
 
@@ -282,7 +312,9 @@ class Store:
                 (str(uuid.uuid4()), event["id"], watchlist_id, now, title[:200], body[:2000]))
             return cursor.rowcount == 1
 
-    def analytics(self, weapon=""):
+    def analytics(self, weapon="", now=None):
+        now = time.time() if now is None else now
+        cutoff = now - self.settings()["risk_thresholds"]["max_age_hours"] * 3600
         where, params = ("WHERE l.weapon=?", [weapon]) if weapon else ("", [])
         snapshots = self.db.execute(f"SELECT s.observed_at,s.payload FROM snapshots s JOIN listings l ON l.id=s.listing_id {where} ORDER BY s.observed_at DESC LIMIT 20000", params)
         series, bids = [], []
@@ -293,9 +325,20 @@ class Store:
             elif item.highest_bid is not None:
                 bids.append((row[0], item.highest_bid, item.id))
         obs = [dict(r) for r in self.db.execute("SELECT * FROM observations WHERE (?='' OR weapon=?) ORDER BY at DESC LIMIT 2000", (weapon, weapon))]
-        current = [x["listing"].price for x in self.listings(10000, weapon=weapon) if x["listing"].kind == "direct" and x["listing"].price is not None]
+        # Current distributions use active, fresh asks. Historical charts above
+        # deliberately retain past asks and bids, including closed listings.
+        current = [r[0] for r in self.db.execute("""SELECT price FROM listings
+            WHERE state='active' AND kind='direct' AND price IS NOT NULL
+            AND last_seen BETWEEN ? AND ? AND (?='' OR weapon=?)
+            ORDER BY last_seen DESC LIMIT 10000""", (cutoff, now, weapon, weapon))]
+        qualified = self.db.execute("""SELECT COUNT(*) FROM valuations v
+            JOIN listings l ON l.id=v.listing_id
+            WHERE l.state='active' AND l.last_seen BETWEEN ? AND ?
+            AND v.at BETWEEN ? AND ? AND (?='' OR l.weapon=?)
+            AND json_extract(v.payload,'$.qualifies')=1""",
+            (cutoff, now, cutoff, now, weapon, weapon)).fetchone()[0]
         return {"asking": series, "bids": bids, "observations": obs, "prices": current,
-                "qualified": self.db.execute("SELECT COUNT(*) FROM valuations WHERE json_extract(payload,'$.qualifies')=1").fetchone()[0]}
+                "qualified": qualified}
 
     def backup(self, destination, overwrite=False):
         destination = Path(destination)

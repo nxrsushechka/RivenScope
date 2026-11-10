@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import os
 from pathlib import Path
+import shlex
 import shutil
 import subprocess
 import sys
@@ -50,7 +51,7 @@ def install(wheel,home):
                     raise ValueError("Unsafe wheel entry")
                 if member.file_size>20_000_000: raise ValueError("Unexpected oversized package file")
             archive.extractall(lib)
-        launch="""#!/usr/bin/python
+        launch="""#!/usr/bin/env python3
 # RivenScope managed installation v1
 from pathlib import Path
 import sys
@@ -71,7 +72,8 @@ raise SystemExit(main())
             if (release/"WHEEL_SHA256").read_text().strip()!=digest: raise ValueError("Release directory collision")
             shutil.rmtree(stage)
         else: os.replace(stage,release)
-        launcher=f'#!/bin/sh\n# {MARKER}\nexec /usr/bin/python -I "{app_root}/current/launch.py" "$@"\n'
+        # Retain the runtime that passed the staged Qt check, including a venv.
+        launcher=f'#!/bin/sh\n# {MARKER}\nexec {shlex.quote(sys.executable)} -I {shlex.quote(str(app_root / "current/launch.py"))} "$@"\n'
         if any(c in str(app_root) for c in ('"','$','`','\n')): raise ValueError("Unsupported characters in installation path")
         # Validate desktop content before switching the active release.
         entry=f'''[Desktop Entry]
@@ -93,7 +95,7 @@ StartupWMClass=rivenscope
             test_entry=Path(temporary)/"rivenscope.desktop"; test_entry.write_text(entry)
             if shutil.which("desktop-file-validate"): subprocess.run(["desktop-file-validate",str(test_entry)],check=True)
         current=app_root/"current"; previous=app_root/"previous"
-        if current.is_symlink():
+        if current.is_symlink() and current.resolve() != release.resolve():
             previous.unlink(missing_ok=True); previous.symlink_to(current.readlink())
         new=app_root/".current-new"; new.unlink(missing_ok=True); new.symlink_to(release.relative_to(app_root)); os.replace(new,current)
         atomic_text(binary,launcher,0o755)

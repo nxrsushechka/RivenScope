@@ -1,0 +1,3 @@
+# Tested development Qt runtime. System Qt remains supported by the installer.
+-r requirements-build.txt
+PySide6==6.8.3

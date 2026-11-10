@@ -11,7 +11,7 @@ from .helpers import NOW, listing, comparables
 
 class AnalysisTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix="rivenscope-analysis-", dir="/tmp/opencode")
+        self.temp = tempfile.TemporaryDirectory(prefix="rivenscope-analysis-")
         self.store = Store(Path(self.temp.name) / "db.sqlite")
         self.engine = AnalysisEngine(self.store)
 

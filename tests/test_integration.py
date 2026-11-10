@@ -6,13 +6,18 @@ from pathlib import Path
 import tempfile
 import time
 import unittest
+from threading import Event
+from unittest.mock import patch
 from PySide6.QtCore import QObject, Signal, QTimer
 from PySide6.QtWidgets import QApplication
 from PySide6.QtTest import QTest
 from rivenscope.network import Outcome
 from rivenscope.scheduler import Scheduler
-from rivenscope.service import Controller
+from rivenscope.service import Controller, Worker
 from rivenscope.storage import Store
+from rivenscope.valuation import estimate
+from rivenscope.domain import MARKET_PAGE_SIZE
+from .helpers import listing, comparables, NOW
 
 APP = QApplication.instance() or QApplication([])
 FIXTURES = Path(__file__).parent / "fixtures/live"
@@ -80,8 +85,73 @@ class SchedulerIntegrationTests(unittest.TestCase):
 
 
 class WorkerIntegrationTests(unittest.TestCase):
+    def test_market_pagination_keeps_all_rows_and_full_comparable_sample(self):
+        with tempfile.TemporaryDirectory() as folder:
+            worker=Worker(Path(folder)/"db.sqlite"); worker.store=Store(worker.path)
+            try:
+                count=MARKET_PAGE_SIZE+5
+                worker.store.observe(comparables(count),"controlled",NOW)
+                with patch("rivenscope.service.time.time",return_value=NOW):
+                    first=worker._execute("market",{})
+                    second=worker._execute("market",{"offset":MARKET_PAGE_SIZE})
+                self.assertEqual(len(first),MARKET_PAGE_SIZE)
+                self.assertEqual(len(second),5)
+                self.assertEqual(len({row["listing"].id for row in first+second}),count)
+                self.assertEqual(second[0]["estimate"].sample_size,count-1)
+            finally:
+                worker.store.close()
+
+    def test_shutdown_interrupts_running_market_and_discards_queued_refreshes(self):
+        with tempfile.TemporaryDirectory() as folder:
+            database=Path(folder)/"db.sqlite"
+            store=Store(database)
+            store.observe(comparables(1000),"controlled",time.time())
+            store.close()
+            controller=Controller(database,transport=ControlledTransport())
+            ready=[]; errors=[]
+            controller.ready.connect(ready.append); controller.error.connect(errors.append)
+            entered=Event()
+            def observed_estimate(*args,**kwargs):
+                entered.set()
+                return estimate(*args,**kwargs)
+            try:
+                self.assertTrue(wait_for(lambda:ready))
+                with patch("rivenscope.service.estimate",side_effect=observed_estimate):
+                    for _ in range(5): controller.submit("market",{})
+                    self.assertTrue(wait_for(entered.is_set))
+                    controller.scheduler.budget.start(time.time())
+                    expected_budget=controller.scheduler.budget.snapshot()
+                    controller.shutdown()
+                    self.assertTrue(wait_for(lambda:not controller.thread.isRunning()))
+                self.assertEqual(errors,[])
+                self.assertTrue(wait_for(lambda:not controller.pending))
+                store=Store(database)
+                self.assertEqual(store.state("budget"),expected_budget)
+                store.close()
+            finally:
+                controller.shutdown()
+                self.assertTrue(wait_for(lambda:not controller.thread.isRunning()))
+
+    def test_valuation_uses_database_comparables_outside_visible_page(self):
+        with tempfile.TemporaryDirectory() as folder:
+            worker=Worker(Path(folder)/"db.sqlite")
+            worker.store=Store(worker.path)
+            try:
+                worker.store.observe(comparables()+[listing()], "q", NOW)
+                visible=[row for row in worker.store.listings() if row["listing"].id=="test-1"]
+                with patch.object(worker.store,"listings",return_value=visible), patch("rivenscope.service.time.time",return_value=NOW):
+                    result=worker._execute("market",{})[0]["estimate"]
+                self.assertEqual(result.sample_size,20)
+                self.assertTrue(result.qualifies)
+                worker.store.observe([listing("comp-0",status="closed")],"q",NOW+1)
+                with patch.object(worker.store,"listings",return_value=visible), patch("rivenscope.service.time.time",return_value=NOW+1):
+                    result=worker._execute("market",{})[0]["estimate"]
+                self.assertEqual(result.sample_size,19)  # DB change invalidates cached sample.
+            finally:
+                worker.store.close()
+
     def test_worker_cache_lifecycle_and_ui_heartbeat(self):
-        with tempfile.TemporaryDirectory(dir="/tmp/opencode") as folder:
+        with tempfile.TemporaryDirectory() as folder:
             transport=ControlledTransport(); controller=Controller(Path(folder)/"db.sqlite",transport=transport)
             ready=[]; errors=[]; controller.ready.connect(ready.append); controller.error.connect(errors.append)
             self.assertTrue(wait_for(lambda:ready))
@@ -107,7 +177,7 @@ class WorkerIntegrationTests(unittest.TestCase):
             store=Store(Path(folder)/"db.sqlite"); self.assertEqual(len(store.catalog("weapons")),420); store.close()
 
     def test_corruption_recovery_preserves_original(self):
-        with tempfile.TemporaryDirectory(dir="/tmp/opencode") as folder:
+        with tempfile.TemporaryDirectory() as folder:
             root=Path(folder); original=Store(root/"original.sqlite"); original.backup(root/"backup.sqlite"); original.close()
             damaged=root/"damaged.sqlite"; damaged.write_bytes(b"controlled corruption")
             with self.assertLogs("rivenscope.service", level="ERROR"):

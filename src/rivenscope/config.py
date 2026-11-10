@@ -7,6 +7,7 @@ from .domain import RISK_PROFILES, finite
 DEFAULTS = {
     "risk_profile": "Balanced", "risk_thresholds": dict(RISK_PROFILES["Balanced"]),
     "catalog_interval_minutes": 60, "global_priority": 3,
+    "legacy_contracts": False, "contract_weapons": ["torid"], "contract_interval_minutes": 10,
     "in_app": True, "desktop": False, "sound": False, "sound_path": "", "highlight": True,
     "notify_existing": False, "notify_new": True, "notify_price": True,
     "notification_limit": 5, "notification_statuses": ["ingame", "online"],
@@ -49,13 +50,19 @@ def validate_settings(data):
     if thresholds["discount"] > 100 or thresholds["confidence"] > 100 or not 5 <= thresholds["samples"] <= 10000 or not 1 <= thresholds["max_age_hours"] <= 8760:
         raise ValueError("Risk thresholds out of range")
     for name, (low, high) in {"catalog_interval_minutes": (60, 1440), "global_priority": (1, 10),
-                             "notification_limit": (1, 60), "retention_days": (7, 3650)}.items():
+                             "notification_limit": (1, 60), "retention_days": (7, 3650), "contract_interval_minutes": (1,1440)}.items():
         value = merged[name]
         if type(value) is not int or not low <= value <= high:
             raise ValueError(f"Invalid {name}")
-    for name in ("in_app", "desktop", "sound", "highlight", "notify_existing", "notify_new", "notify_price", "dense_table"):
+    for name in ("in_app", "desktop", "sound", "highlight", "notify_existing", "notify_new", "notify_price", "dense_table", "legacy_contracts"):
         if type(merged[name]) is not bool:
             raise ValueError(f"Invalid {name}")
+    from .contracts import contract_key
+    weapons = merged["contract_weapons"]
+    if not isinstance(weapons, list) or len(weapons) > 1000 or any(not isinstance(w,str) for w in weapons) or len(set(weapons)) != len(weapons):
+        raise ValueError("Invalid search weapon list")
+    for weapon in weapons:
+        if weapon != "*": contract_key(weapon)
     if not isinstance(merged["sound_path"], str) or len(merged["sound_path"]) > 4096:
         raise ValueError("Invalid sound path")
     for key in ("notification_statuses", "seller_priority"):

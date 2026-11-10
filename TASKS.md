@@ -1,5 +1,37 @@
 # RivenScope — итог этапов, 2026-11-10
 
+## Текущий этап — экспериментальный поиск 0.2.0
+
+- [x] Проверить пользовательские HTTP headers и 100 реальных Torid-аукционов.
+- [x] Реализовать строгий parser и opt-in read-only legacy search.
+- [x] Подключить scope/watchlists, общий budget, interval/coalescing и partial semantics.
+- [x] Импортировать реальный snapshot в отдельный профиль и проверить GUI.
+- [x] Полный прогон: 71 passed, 0 skipped, включая packaging.
+- [ ] Проверить повторный live search сборкой 0.2.0 на Omarchy; cloud получает challenge.
+- [ ] Подтвердить direct/buyout, pagination и raw-roll normalization перед valuation.
+
+Подробности: [READINESS_0.2.0](docs/READINESS_0.2.0.md).
+Следующий этап 0.1.1 и остальные отчёты ниже сохранены как история.
+
+## Текущий этап — восстановление и исправления 0.1.1
+
+- [x] Восстановить исходники GUI/app/analysis/assets из сверенного старого релиза.
+- [x] Удалить из дерева отслеживаемые build/dist/bytecode с сохранением старых файлов вне checkout.
+- [x] Собирать в чистом staging; проверить source archive → идентичный release.
+- [x] Исправить возврат исчезнувших объявлений и аналитику неактивных/устаревших цен.
+- [x] Отвязать valuation comparables от открытой страницы таблицы; проверить кэш.
+- [x] Ускорить повторяемые comparisons; ограничить страницу 250 строками, проверить базу 10 000 объявлений.
+- [x] Проверить отмену активного расчёта и очереди при закрытии; сохранять previous при повторной установке.
+- [x] Исправить HTTP header-case test, runtime установщика и изолированные профили.
+- [x] Закрепить dev Qt, добавить CI; выполнить локально полный прогон: 63 passed, 0 skipped.
+- [x] Controlled soak 180 с: 682 refreshes, 0 ошибок, RSS после прогрева 0,56 МБ, heartbeat p99 69 мс.
+- [x] Проверить свежий официальный docs Git HEAD: новых contract routes нет.
+- [ ] Выполнить native menu/audio/notifications checks 0.1.1 на Omarchy.
+- [ ] Подключить и проверить реальный contract adapter после подтверждения доступа WFM.
+
+Подробности и оставшиеся ограничения: [READINESS_0.1.1](docs/READINESS_0.1.1.md).
+Отчёты ниже описывают **историческую проверку 0.1.0**, а не новый native-прогон.
+
 Status keys: DONE = implemented and checked; BLOCKED = upstream capability absent;
 IN PROGRESS = active work; PENDING = not yet verified. No blocked feature counts as done.
 

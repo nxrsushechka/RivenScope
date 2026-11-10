@@ -5,7 +5,7 @@ import unittest
 from rivenscope.domain import Attribute, Listing, safe_market_url
 from rivenscope.filters import validate, matches, evaluate, server_plan
 from rivenscope.network import parse_manifest, decode_response, Outcome
-from rivenscope.valuation import estimate, weighted_quantile
+from rivenscope.valuation import estimate, weighted_quantile, PreparedComparables
 from rivenscope.scheduler import Budget, FairQueue, retry_seconds
 from rivenscope.config import validate_settings
 from .helpers import NOW, listing, comparables
@@ -90,6 +90,27 @@ class FilterTests(unittest.TestCase):
 
 
 class ValuationTests(unittest.TestCase):
+    def test_prepared_sample_keeps_target_exclusions_and_thresholds_separate(self):
+        items=comparables()
+        pool=PreparedComparables(items,NOW)
+        first=estimate(listing(seller=items[0].seller),pool,NOW)
+        second=estimate(listing(seller=items[1].seller),pool,NOW)
+        self.assertEqual(first.sample_size,19)
+        self.assertNotIn(items[0].id,first.comparable_ids)
+        self.assertIn(items[0].id,second.comparable_ids)
+        self.assertNotIn(items[1].id,second.comparable_ids)
+        cheaper=estimate(listing(price=100,seller=items[0].seller),pool,NOW)
+        self.assertEqual(cheaper.value,first.value)
+        self.assertEqual(cheaper.profit,first.profit+400)
+        stale=PreparedComparables([replace(c,observed_at=NOW-48*3600) for c in items],NOW)
+        self.assertIsNotNone(estimate(listing(),stale,NOW,"Balanced").value)
+        self.assertIsNone(estimate(listing(),stale,NOW,"Conservative").value)
+        with self.assertRaises(ValueError): estimate(listing(),pool,NOW+1)
+
+    def test_expensive_valuation_can_be_cancelled(self):
+        with self.assertRaises(InterruptedError):
+            estimate(listing(),comparables(),NOW,cancelled=lambda:True)
+
     def test_estimate_formulas_and_explanation(self):
         result = estimate(listing(), comparables(), NOW)
         self.assertEqual(result.value, 1000)

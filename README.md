@@ -3,21 +3,24 @@
 Локальное десктопное приложение для исследования Riven Mods на Warframe Market.
 Python + PySide6, SQLite, нативный Wayland-интерфейс. Интерфейс — на английском.
 
-## Важный статус версии 0.1.0
+## Важный статус версии 0.2.0
 
-**Это установленная версия с ограниченными источником возможностями, а не завершённый
-живой монитор рынка.** На 9 ноября 2026 года поддерживаемый публичный API поиска
-Riven contracts не документирован. v1 объявлен неподдерживаемым; обычные orders
-не являются Riven contracts.
+Есть экспериментальный read-only legacy v1 поиск уникальных Riven-объявлений.
+Пользователь подтвердил маршрут HTTP 200 / JSON со 100 Torid-аукционами; ответ
+используется в тестах. Режим выключен по умолчанию: WFM объявляет v1 unsupported.
 
-Приложение получает реальные справочники WFM: **420 оружий и 50 характеристик** в
-проверенном ответе. Сохраняет пресеты с вложенными фильтрами, настройки и базу;
-предоставляет резервное копирование, экспорт, диагностику и инструменты локальной
-аналитики. Данные контрактов, реальные ценовые оценки и торговые оповещения сейчас
-**недоступны**. В рабочую базу не добавляются примеры или искусственная история.
+Чтобы включить: **Settings → Preferences → Monitoring → Enable experimental legacy
+v1 searches**, укажите weapon slugs (например `torid`, либо `*` для каталога),
+сохраните и нажмите **Start monitoring**. Включённые watchlists добавляют области
+поиска. Общий лимит — 10 запросов/мин; ответы частичные, полного охвата не обещаем.
 
-Подробное исследование: [API_FEASIBILITY](docs/API_FEASIBILITY.md).
-Все ограничения: [LIMITATIONS](docs/LIMITATIONS.md).
+Объявления, ставки, продавцы и собственная история отображаются. Контекст числовых
+roll values ещё не подтверждён, поэтому legacy valuation возвращает **Insufficient
+data**. Все 100 предоставленных записей — аукционы без выкупа: начальные ставки
+не выдаются за цену покупки. Искусственные контракты в рабочую базу не добавляются.
+
+Подробности: [READINESS_0.2.0](docs/READINESS_0.2.0.md),
+[API_FEASIBILITY](docs/API_FEASIBILITY.md), [LIMITATIONS](docs/LIMITATIONS.md).
 
 ## Запуск после установки
 
@@ -26,18 +29,25 @@ rivenscope
 ```
 
 Или выберите **RivenScope** в меню приложений Omarchy.
-Нажмите **Start catalog sync**. Закрытие окна останавливает задачи и сетевые запросы.
+Нажмите **Start monitoring**. Закрытие окна останавливает задачи и сетевые запросы.
 Автозапуска и фонового сервиса нет. Авторизация не нужна.
 
 ## Сборка и установка
 
-На проверенной системе уже установлены Python, PySide6, Qt6 Wayland и libnotify.
+Архивы версии 0.2.0 и контрольные суммы доступны в
+[GitHub Releases](https://github.com/nxrsushechka/RivenScope/releases/tag/v0.2.0).
+
+На Omarchy с системными PySide6 и Qt6 Wayland используйте venv с
+`--system-site-packages` и `requirements-build.txt`, как описано в INSTALLATION.
+Для воспроизводимой разработки в Linux проверен Python 3.12 + PySide6 6.8.3
+(закреплённый dev runtime поддерживает Python 3.12/3.13):
 
 ```bash
-python -m venv --system-site-packages .venv
-.venv/bin/python -m pip install -r requirements-build.txt
+python -m venv .venv
+.venv/bin/python -m pip install -r requirements-dev.txt
+QT_QPA_PLATFORM=offscreen PYTHONPATH=src RIVENSCOPE_PACKAGING=1 .venv/bin/python -m unittest discover -s tests -t . -v
 .venv/bin/python tools/build_release.py
-python tools/install.py
+.venv/bin/python tools/install.py
 ```
 
 Установка выполняется только в домашний каталог, без `sudo`.
@@ -54,14 +64,16 @@ python tools/install.py
 ## Проверки
 
 ```bash
-QT_QPA_PLATFORM=offscreen PYTHONPATH=src python -m unittest discover -s tests -t . -v
-QT_QPA_PLATFORM=wayland python tools/live_smoke.py --directory /tmp/opencode/rivenscope-live-check
-QT_QPA_PLATFORM=offscreen python tools/soak.py --seconds 600 --output test-artifacts/soak.json
+QT_QPA_PLATFORM=offscreen PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -t . -v
+QT_QPA_PLATFORM=wayland .venv/bin/python tools/live_smoke.py --directory /tmp/rivenscope-live-check
+QT_QPA_PLATFORM=offscreen .venv/bin/python tools/soak.py --seconds 600 --output test-artifacts/soak.json
 ```
 
 Полный прогон, включая build/install/update/uninstall тесты: добавьте
-`RIVENSCOPE_PACKAGING=1` перед командой unittest. Подтверждено **53 passed**,
-нативный запуск установленной версии из меню и 10-минутный контролируемый soak.
+`RIVENSCOPE_PACKAGING=1` перед командой unittest. Для 0.2.0 в облачной Linux-среде
+подтверждено **71 passed, 0 skipped**, включая чистую сборку и установку.
+Нативный Wayland/menu launch ранее проверялся для 0.1.0; для 0.2.0 здесь не проверен.
+Новые результаты: [проверка 0.2.0](docs/READINESS_0.2.0.md).
 
 Live smoke тест запрашивает только документированные справочники, с тем же
 ограничителем 10 запросов/минуту. Не запускайте одновременно несколько live-прогонов.
@@ -71,5 +83,5 @@ Fixtures настоящего API находятся в `tests/fixtures/live/`; 
 Отчёт: [TEST_REPORT](docs/TEST_REPORT.md). Руководство: [USER_GUIDE](docs/USER_GUIDE.md).
 Архитектура: [ARCHITECTURE](docs/ARCHITECTURE.md). Этапы: [TASKS](TASKS.md).
 
-Проект не опубликован в GitHub. Телеметрии, автоматической торговли и запросов к
+Удалённый источник релизов не настроен. Телеметрии, автоматической торговли и запросов к
 сторонним оценочным сервисам нет. Предполагаемая выгода не гарантирует прибыль.

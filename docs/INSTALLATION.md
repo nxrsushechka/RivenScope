@@ -2,6 +2,13 @@
 
 ## Проверенное окружение
 
+Исторические native-проверки ниже относятся к 0.1.0. Для 0.2.0 в cloud Linux
+проверены Python 3.12.14, PySide6 6.8.3, offscreen UI и установщик.
+Для такого dev-окружения: `python -m venv .venv`, затем
+`.venv/bin/python -m pip install -r requirements-dev.txt`.
+Закреплённый PySide6 6.8.3 требует Python <3.14; для системного Python 3.14 на
+Omarchy используйте системный PySide6 и описанный ниже `--system-site-packages`.
+
 - Omarchy 4.0.6, Hyprland, Wayland.
 - Python 3.14.8, PySide6 / Qt 6.12.0, Qt6 Wayland.
 - `notify-send` из libnotify, `desktop-file-validate`, `update-desktop-database`.
@@ -26,15 +33,26 @@ omarchy pkg add python pyside6 qt6-wayland libnotify desktop-file-utils
 ```bash
 python -m venv --system-site-packages .venv
 .venv/bin/python -m pip install -r requirements-build.txt
-QT_QPA_PLATFORM=offscreen PYTHONPATH=src python -m unittest discover -s tests -t . -v
+QT_QPA_PLATFORM=offscreen PYTHONPATH=src RIVENSCOPE_PACKAGING=1 .venv/bin/python -m unittest discover -s tests -t . -v
 .venv/bin/python tools/build_release.py
-python tools/install.py
+.venv/bin/python tools/install.py
 ```
 
 Результаты в `dist/`: wheel, исходный архив и `SHA256SUMS`. Build задаёт фиксированные
 timestamp/порядок архива. Одинаковые исходники и закреплённый toolchain дают одинаковые
 артефакты. Подпись доверенного удалённого издателя не настроена; SHA256 проверяет
 целостность локально собранных файлов, а не личность издателя.
+
+Сборка использует только исходники и отдельный временный каталог, не читает старый
+`build/`. Wheel включает GUI и ресурсы; source archive позволяет повторить сборку
+без готовых артефактов. Контрольные суммы совпадают при повторной сборке и при
+сборке из распакованного source archive. Альтернативный каталог результатов:
+`.venv/bin/python tools/build_release.py --output-dir /tmp/rivenscope-release`.
+
+Ярлык использует Python, которым выполнена установка и проверка staging.
+Если это `.venv/bin/python`, сохраните этот venv по прежнему пути; после перемещения
+проекта или смены runtime повторите установку. Системный Python можно использовать,
+если в нём доступны совместимые PySide6/Qt.
 
 Установщик:
 1. Проверяет Qt и SHA256 wheel.

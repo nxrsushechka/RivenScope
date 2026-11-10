@@ -50,8 +50,9 @@ class TransportTests(unittest.TestCase):
 
     def test_http_headers_limits_server_error_and_reconnect(self):
         self.assertEqual(self.request("success").status,200)
-        self.assertEqual(Handler.seen[-1]["User-Agent"],USER_AGENT)
-        self.assertEqual(Handler.seen[-1]["Crossplay"],"true")
+        headers={name.lower():value for name,value in Handler.seen[-1].items()}
+        self.assertEqual(headers["user-agent"],USER_AGENT)
+        self.assertEqual(headers["crossplay"],"true")
         result=self.request("limit"); self.assertEqual(result.status,429); self.assertEqual(result.retry_after,"120")
         self.assertEqual(self.request("error").status,503)
         self.assertEqual(self.request("success").status,200)

@@ -12,14 +12,15 @@ from .widgets import label, button
 
 
 class Preferences(QWidget):
-    def __init__(self, data=None, parent=None):
+    def __init__(self, data=None, parent=None, include_monitoring=True):
         super().__init__(parent)
         self.original = validate_settings(data or {})
         self.controls = {}
         layout = QVBoxLayout(self); tabs = QTabWidget(); layout.addWidget(tabs)
-        for title, keys in (("Monitoring", ["catalog_interval_minutes", "global_priority", "retention_days", "dense_table"]),
+        for title, keys in (("Monitoring", ["legacy_contracts", "contract_weapons", "contract_interval_minutes", "catalog_interval_minutes", "global_priority", "retention_days", "dense_table"]),
                             ("Risk", ["risk_profile"]),
                             ("Notifications", ["in_app", "desktop", "sound", "sound_path", "highlight", "notify_existing", "notify_new", "notify_price", "notification_limit"])):
+            if title == "Monitoring" and not include_monitoring: continue
             widget = QWidget(); form = QFormLayout(widget); form.setSpacing(12); tabs.addTab(widget, title)
             for key in keys:
                 value = self.original[key]
@@ -27,13 +28,16 @@ class Preferences(QWidget):
                     control = QCheckBox(); control.setChecked(value)
                 elif type(value) is int:
                     control = QSpinBox()
-                    ranges = {"catalog_interval_minutes": (60, 1440), "global_priority": (1,10), "retention_days": (7,3650), "notification_limit": (1,60)}
+                    ranges = {"catalog_interval_minutes": (60, 1440), "contract_interval_minutes": (1,1440), "global_priority": (1,10), "retention_days": (7,3650), "notification_limit": (1,60)}
                     control.setRange(*ranges[key]); control.setValue(value)
                 elif key == "risk_profile":
                     control = QComboBox(); control.addItems(list(RISK_PROFILES)); control.setCurrentText(value)
-                else: control = QLineEdit(value)
+                else: control = QLineEdit(", ".join(value) if isinstance(value,list) else value)
                 self.controls[key] = control
                 names = {"catalog_interval_minutes": "Catalog check interval (minutes)", "global_priority": "Global request priority",
+                         "legacy_contracts": "Enable experimental legacy v1 searches",
+                         "contract_weapons": "Weapon slugs (comma-separated; * = all)",
+                         "contract_interval_minutes": "Minimum interval per weapon (minutes)",
                          "notification_limit": "Maximum alerts per minute", "retention_days": "History retention (days; manual prune)",
                          "sound_path": "Local WAV file", "notify_existing": "Notify on existing listings", "notify_new": "Notify on new discoveries", "notify_price": "Notify on price changes"}
                 form.addRow(names.get(key, key.replace("_", " ").title()), control)
@@ -73,6 +77,7 @@ class Preferences(QWidget):
             elif isinstance(control, QCheckBox): result[key] = control.isChecked()
             elif isinstance(control, QSpinBox): result[key] = control.value()
             elif isinstance(control, QComboBox): result[key] = control.currentText()
+            elif key == "contract_weapons": result[key] = [w.strip() for w in control.text().split(",") if w.strip()]
             else: result[key] = control.text()
         result["notification_statuses"] = [k for k,v in self.statuses.items() if v.isChecked()]
         result["seller_priority"] = self.priority.currentData()
@@ -103,9 +108,9 @@ class WatchlistDialog(QDialog):
             item.setSelected(weapon["slug"] in self.value["weapons"])
         form.addRow("Weapons (none = all)", self.weapons)
         self.weapon_search.textChanged.connect(lambda text: [self.weapons.item(i).setHidden(text.casefold() not in self.weapons.item(i).text().casefold()) for i in range(self.weapons.count())])
-        form.addRow(label("Set maximum/minimum price, attribute ranges and seller-status logic in Conditions. All local presets are retained; live search is currently unavailable.", "subtitle", True))
+        form.addRow(label("Conditions are applied locally to partial weapon searches. Enable experimental legacy searches in Settings to poll enabled watchlists. Numeric roll context and valuation remain unverified.", "subtitle", True))
         self.builder = FilterBuilder(attributes); self.builder.set_expression(self.value["filter"]); tabs.addTab(self.builder, "Conditions")
-        self.preferences = Preferences(settings | self.value["settings"]); tabs.addTab(self.preferences, "Alerts & risk")
+        self.preferences = Preferences(settings | self.value["settings"],include_monitoring=False); tabs.addTab(self.preferences, "Alerts & risk")
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.save); buttons.rejected.connect(self.reject); layout.addWidget(buttons)
 

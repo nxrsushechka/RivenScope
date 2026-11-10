@@ -13,7 +13,7 @@ from .helpers import NOW, listing, comparables
 
 class StorageTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix="rivenscope-", dir="/tmp/opencode")
+        self.temp = tempfile.TemporaryDirectory(prefix="rivenscope-")
         self.root = Path(self.temp.name); self.path = self.root / "test.sqlite"
         self.store = Store(self.path)
 
@@ -62,6 +62,18 @@ class StorageTests(unittest.TestCase):
         with self.assertRaises(ValueError): self.store.observe([listing(), listing()], "q", NOW)
         self.assertEqual(self.store.summary()["listings"], 0)
 
+    def test_unchanged_listing_return_is_recorded_once_across_restart(self):
+        item = listing()
+        self.store.observe([item], "q", NOW, complete=True)
+        self.store.observe([], "q", NOW+1, complete=True)
+        self.store.close(); self.store = Store(self.path)
+        returned = self.store.observe([replace(item, observed_at=NOW+2)], "q", NOW+2, complete=True)
+        self.assertEqual([e["kind"] for e in returned], ["status_changed"])
+        self.assertEqual(self.store.listings()[0]["listing"].status, "active")
+        self.assertEqual(len(self.store.history(item.id)["snapshots"]), 2)
+        self.assertEqual(self.store.observe([item], "q", NOW+3, complete=True), [])
+        self.assertEqual(len(self.store.history(item.id)["events"]), 3)
+
     def test_export_import_watchlists(self):
         self.store.save_watchlist(new_watchlist()); dest = self.root / "presets.json"
         self.store.export_file(dest, "watchlists"); self.store.import_file(dest, "watchlists")
@@ -93,9 +105,33 @@ class StorageTests(unittest.TestCase):
 
     def test_analytics_never_mix_bids(self):
         self.store.observe([listing(), listing("auction", kind="auction", highest_bid=200)], "q", NOW)
-        analytics = self.store.analytics()
+        analytics = self.store.analytics(now=NOW)
         self.assertEqual(analytics["prices"], [500]); self.assertEqual(len(analytics["bids"]), 1)
         self.assertEqual(len(analytics["asking"]), 1)
+
+    def test_current_analytics_excludes_inactive_stale_and_future_asks(self):
+        self.store.observe([listing("stale", price=50)], "stale", NOW-73*3600)
+        self.store.observe([listing("missing", price=100)], "q", NOW-1, complete=True)
+        self.store.observe([], "q", NOW, complete=True)
+        self.store.observe([listing("closed", price=200, status="closed"),
+                            listing("current", price=600)], "recent", NOW)
+        self.store.observe([listing("future", price=700)], "future", NOW+1)
+        analytics = self.store.analytics(now=NOW)
+        self.assertEqual(analytics["prices"], [600])
+        self.assertEqual(len(analytics["asking"]), 5)  # History is preserved.
+
+    def test_qualified_analytics_respects_weapon_state_and_freshness(self):
+        items = [listing("torid"), listing("other", weapon="other"),
+                 listing("closed", status="closed"), listing("old_estimate")]
+        self.store.observe(items, "q", NOW)
+        result = estimate(listing(), comparables(), NOW)
+        self.assertTrue(result.qualifies)
+        for item in items:
+            self.store.save_estimate(item.id, result, NOW-73*3600 if item.id == "old_estimate" else NOW)
+        self.assertEqual(self.store.analytics(now=NOW)["qualified"], 2)
+        self.assertEqual(self.store.analytics("torid", now=NOW)["qualified"], 1)
+        self.assertEqual(self.store.analytics("other", now=NOW)["qualified"], 1)
+        self.assertEqual(self.store.analytics(now=NOW+73*3600)["qualified"], 0)
 
     def test_notification_dedup_limits_and_existing_suppression(self):
         target = listing(); result = estimate(target, comparables(), NOW); settings = validate_settings({})

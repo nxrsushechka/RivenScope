@@ -1,0 +1,11 @@
+{
+  "source": "User-supplied native curl response and headers",
+  "url": "https://api.warframe.market/v1/auctions/search?type=riven&weapon_url_name=torid",
+  "captured_at": "2026-11-10T12:25:11+00:00",
+  "status": 200,
+  "content_type": "application/json",
+  "records": 100,
+  "sha256": "155a76adfcc53e41afd6203b4cc39fe6b9e69ddc86fb33f32bfca91da9f03ca0",
+  "complete": false,
+  "notes": "No pagination/completeness proven. All records are auctions without buyout. Full headers, cookies and network identifiers are not included."
+}

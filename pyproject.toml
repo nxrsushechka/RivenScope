@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rivenscope"
-version = "0.1.0"
+version = "0.2.0"
 description = "Capability-aware Warframe Riven research desktop"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -20,4 +20,4 @@ where = ["src"]
 rivenscope = ["assets/*"]
 
 [tool.setuptools.data-files]
-"share/rivenscope/docs" = ["README.md", "TASKS.md", "docs/API_FEASIBILITY.md", "docs/ARCHITECTURE.md", "docs/INSTALLATION.md", "docs/USER_GUIDE.md", "docs/UPDATING.md", "docs/TEST_REPORT.md", "docs/LIMITATIONS.md", "docs/FINAL_REPORT.md"]
+"share/rivenscope/docs" = ["README.md", "TASKS.md", "docs/API_FEASIBILITY.md", "docs/ARCHITECTURE.md", "docs/INSTALLATION.md", "docs/USER_GUIDE.md", "docs/UPDATING.md", "docs/TEST_REPORT.md", "docs/LIMITATIONS.md", "docs/FINAL_REPORT.md", "docs/READINESS_0.1.1.md", "docs/READINESS_0.2.0.md"]

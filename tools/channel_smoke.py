@@ -16,7 +16,7 @@ from rivenscope.notifications import Channels
 def main():
     app=QApplication([]); channel=Channels()
     result={"desktop":False,"in_app":False,"audio_started":False,"audio_finished":False,"warnings":[]}
-    with tempfile.TemporaryDirectory(prefix="rivenscope-audio-",dir="/tmp/opencode") as root:
+    with tempfile.TemporaryDirectory(prefix="rivenscope-audio-") as root:
         wav=Path(root)/"test.wav"
         with wave.open(str(wav),"wb") as stream:
             stream.setnchannels(1); stream.setsampwidth(2); stream.setframerate(22050)

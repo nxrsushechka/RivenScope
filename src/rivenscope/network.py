@@ -1,4 +1,4 @@
-"""Only documented, verified, anonymous v2 manifests are reachable here."""
+"""Anonymous catalog requests and explicit read-only legacy auction searches."""
 from dataclasses import dataclass
 import json
 import re
@@ -6,11 +6,20 @@ from PySide6.QtCore import QObject, QUrl, QTimer, Signal
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkRequest
 from . import __version__
 from .domain import finite
+from .contracts import PREFIX, search_path
 
 ROUTES = {"versions": "/v2/versions", "weapons": "/v2/riven/weapons", "attributes": "/v2/riven/attributes"}
 BASE_URL = "https://api.warframe.market"
 USER_AGENT = f"RivenScope/{__version__} (Linux desktop; personal Riven research)"
 MAX_BODY = 4 * 1024 * 1024
+
+
+def request_path(key):
+    if key in ROUTES:
+        return ROUTES[key]
+    if isinstance(key, str) and key.startswith(PREFIX):
+        return search_path(key)
+    raise ValueError("Unsupported API route")
 
 
 def parse_manifest(payload, kind):
@@ -83,11 +92,10 @@ class Transport(QObject):
     def get(self, key):
         if self.reply is not None:
             raise RuntimeError("Only one API request may be active")
-        if key not in ROUTES:
-            raise ValueError("Undocumented route blocked")
+        path = request_path(key)
         self.key, self.buffer, self.cancelled, self.too_large = key, bytearray(), False, False
         self.timed_out = False
-        request = QNetworkRequest(QUrl(BASE_URL + ROUTES[key]))
+        request = QNetworkRequest(QUrl(BASE_URL + path))
         for name, value in {"User-Agent": USER_AGENT, "Accept": "application/json", "Language": "en", "Platform": "pc", "Crossplay": "true"}.items():
             request.setRawHeader(name.encode(), value.encode())
         request.setTransferTimeout(self.timeout_ms)
@@ -141,4 +149,4 @@ def decode_response(outcome):
         payload = json.loads(outcome.body)
     except (ValueError, UnicodeDecodeError) as error:
         raise ValueError("API did not return valid JSON") from error
-    return parse_manifest(payload, outcome.key)
+    return payload if outcome.key.startswith(PREFIX) else parse_manifest(payload, outcome.key)

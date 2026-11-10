@@ -8,7 +8,7 @@ from dataclasses import replace
 from .config import validate_settings
 from .domain import finite
 from .notifications import record_notification
-from .valuation import estimate
+from .valuation import estimate, PreparedComparables
 
 
 class AnalysisEngine:
@@ -22,15 +22,17 @@ class AnalysisEngine:
         settings = self.store.settings()
         watchlists = [rule for rule in self.store.watchlists() if rule["enabled"]]
         candidates = {}
+        max_age = max([settings["risk_thresholds"]["max_age_hours"]] + [
+            validate_settings(settings | rule["settings"])["risk_thresholds"]["max_age_hours"] for rule in watchlists])
         results, messages = {}, []
         by_id = {item.id: item for item in listings}
         for event in events:
             item = by_id.get(event["listing_id"])
             if item is None or item.status != "active":
                 continue
-            if item.weapon not in candidates:
-                candidates[item.weapon] = [row["listing"] for row in self.store.listings(limit=10000, weapon=item.weapon)]
-            pool = candidates[item.weapon]
+            if item.comparable_group not in candidates:
+                candidates[item.comparable_group] = PreparedComparables(self.store.comparables(item, observed_at, max_age), observed_at)
+            pool = candidates[item.comparable_group]
             global_result = estimate(item, pool, observed_at, settings["risk_profile"], settings["risk_thresholds"])
             self.store.save_estimate(item.id, global_result, observed_at)
             results[item.id] = global_result

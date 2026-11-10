@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (QMainWindow, QWidget, QFrame, QHBoxLayout, QVBoxL
     QApplication, QGroupBox)
 from .. import __version__, CONTRACT_LIMITATION
 from ..config import DEFAULTS
-from ..domain import safe_market_url
+from ..domain import safe_market_url, MARKET_PAGE_SIZE
 from ..filters import validate
 from ..notifications import Channels
 from .widgets import STYLE, Metric, Table, Chart, label, button, page
@@ -72,7 +72,7 @@ class MainWindow(QMainWindow):
         geometry = self.ui_state.value("geometry")
         if geometry: self.restoreGeometry(geometry)
         for name in ("catalog", "market", "watchlist", "notification"):
-            state = self.ui_state.value(name + "_header")
+            state = self.ui_state.value("market_header_v2" if name=="market" else name + "_header")
             if state: getattr(self, name + "_table").view.horizontalHeader().restoreState(state)
         for splitter, name in ((self.market_splitter, "market_splitter"),):
             state = self.ui_state.value(name)
@@ -85,17 +85,17 @@ class MainWindow(QMainWindow):
     def make_dashboard(self):
         widget, layout = page("Market overview", "Your local research workspace. Source capabilities are shown explicitly.")
         self.stack.addWidget(widget)
-        self.banner = label(CONTRACT_LIMITATION + " Catalog sync remains available.", "banner", True); layout.addWidget(self.banner)
+        self.banner = label(CONTRACT_LIMITATION, "banner", True); layout.addWidget(self.banner)
         actions = QHBoxLayout()
-        self.start_button = button("Start catalog sync", self.start, True); self.start_button.setEnabled(False)
+        self.start_button = button("Start monitoring", self.start, True); self.start_button.setEnabled(False)
         self.stop_button = button("Stop", self.controller.stop); self.stop_button.setEnabled(False)
         actions.addWidget(self.start_button); actions.addWidget(self.stop_button)
         actions.addStretch(); actions.addWidget(button("API documentation ↗", lambda: QDesktopServices.openUrl(QUrl("https://docs.warframe.market/docs/api/manifests/"))))
         layout.addLayout(actions)
         grid = QGridLayout(); grid.setSpacing(14); layout.addLayout(grid)
         self.metrics = {}
-        cards = [("weapons", "Weapon catalog", "Real WFM manifest records"), ("watchlists", "Active watchlists", "Saved locally; contract refresh blocked"),
-                 ("listings", "Observed contracts", "No supported contract feed"), ("new", "New discoveries", "First-seen events since baseline"),
+        cards = [("weapons", "Weapon catalog", "Real WFM manifest records"), ("watchlists", "Active watchlists", "Partial searches when legacy mode is enabled"),
+                 ("listings", "Observed contracts", "Retained observations; total market unknown"), ("new", "New discoveries", "First-seen events since baseline"),
                  ("deals", "Potential deals", "Requires sufficient comparable data"), ("budget", "Request budget", "Shared cap: 10 requests / minute")]
         for i,(key,title,detail) in enumerate(cards):
             metric = Metric(title, "0" if key not in ("deals", "budget") else "—", detail); self.metrics[key] = metric
@@ -103,7 +103,7 @@ class MainWindow(QMainWindow):
         group = QGroupBox("Source & scheduler"); form = QVBoxLayout(group); layout.addWidget(group)
         self.scheduler_label = label("Stopped", wrap=True); form.addWidget(self.scheduler_label)
         self.last_update = label("Last catalog update: Never\nLast market update: Never", "subtitle", True); form.addWidget(self.last_update)
-        self.coverage = label("Coverage: 0 contracts observed · total market size unknown\nUnchecked: all Riven contract searches, every weapon, all seller statuses.\nCatalog completeness is not listing coverage. No WebSocket Riven subscription is documented.", "subtitle", True)
+        self.coverage = label("Coverage: no recorded searches. Total market size unknown.", "subtitle", True)
         form.addWidget(self.coverage)
         self.notice = label("", "notice", True); layout.addWidget(self.notice)
         layout.addStretch()
@@ -132,17 +132,20 @@ class MainWindow(QMainWindow):
         filters.addStretch(); filters.addWidget(button("CSV", lambda:self.export("csv"))); filters.addWidget(button("JSON", lambda:self.export("listings"))); ml.addLayout(filters)
         columns = [("WEAPON", lambda r:r["listing"].weapon.replace("_"," ").title()),
             ("ATTRIBUTES", lambda r:" · ".join(f"{'+' if a.positive else '−'} {a.slug}: {a.value:g}" for a in r["listing"].attributes)),
-            ("PRICE / BUYOUT", lambda r:r["listing"].acquisition), ("EST. VALUE", lambda r:r["estimate"].value),
+            ("PRICE / BUYOUT", lambda r:r["listing"].acquisition),
+            ("STARTING BID", lambda r:r["listing"].starting_bid), ("HIGHEST BID", lambda r:r["listing"].highest_bid),
+            ("EST. VALUE", lambda r:r["estimate"].value),
             ("POTENTIAL PROFIT", lambda r:r["estimate"].profit), ("DISCOUNT %", lambda r:r["estimate"].discount),
             ("CONFIDENCE %", lambda r:r["estimate"].confidence if r["estimate"].value else None),
             ("SELLER STATUS", lambda r:r["listing"].seller_status), ("TYPE", lambda r:r["listing"].kind),
             ("PUBLISHED AGE", lambda r:age(r["listing"].published_at)), ("LAST SEEN", lambda r:timestamp(r["last_seen"]))]
         self.market_table = Table(columns); self.market_table.selected.connect(self.listing_selected)
-        self.market_table.view.setColumnWidth(0,170); self.market_table.view.setColumnWidth(1,320)
+        for column,width in enumerate((100,250,120,110,110)):
+            self.market_table.view.setColumnWidth(column,width)
         self.market_splitter = QSplitter(); self.market_splitter.addWidget(self.market_table)
         details = QWidget(); dl = QVBoxLayout(details)
         dl.addWidget(label("Riven details", "pageTitle")); self.details = QTextBrowser(); dl.addWidget(self.details)
-        self.details.setPlainText("No Riven selected.\n\nLive contract data is unavailable. No estimated prices will be fabricated.")
+        self.details.setPlainText("Select an observed Riven. Auctions without buyout have no confirmed acquisition price. Raw roll context is unverified; valuation may be unavailable.")
         self.trade_buttons = []
         for text, callback in (("Open on Warframe Market ↗", self.open_listing), ("Copy seller name", self.copy_seller), ("Copy listing URL", self.copy_url), ("Copy trade message", self.copy_message)):
             b = button(text, callback); b.setEnabled(False); dl.addWidget(b); self.trade_buttons.append(b)
@@ -150,19 +153,19 @@ class MainWindow(QMainWindow):
         self.market_splitter.addWidget(details); self.market_splitter.setSizes([850,360]); ml.addWidget(self.market_splitter)
         pager = QHBoxLayout(); pager.addWidget(button("Previous page", lambda:self.market_page(-1))); pager.addWidget(button("Next page", lambda:self.market_page(1)))
         self.market_count = label("0 observations · 10,000-row pages · starting bids are not acquisition prices", "subtitle", True); pager.addWidget(self.market_count); ml.addLayout(pager)
-        self.market_tabs.addTab(market, "Contracts · unavailable")
+        self.market_tabs.addTab(market, "Contracts · legacy")
 
     def make_watchlists(self):
         widget, layout = page("Watchlists", "Saved search logic, monitoring priorities and independent alert preferences.")
         self.stack.addWidget(widget)
-        layout.addWidget(label("Presets are fully local. Contract polling remains unavailable until a supported endpoint is documented.", "banner", True))
+        layout.addWidget(label("Enable experimental legacy searches in Settings to poll enabled presets. Responses are partial; missing rows do not prove removal.", "banner", True))
         actions = QHBoxLayout()
         for text, cb in (("+ New watchlist",self.new_watchlist), ("Edit",self.edit_watchlist), ("Duplicate",self.copy_watchlist), ("Enable / disable",self.toggle_watchlist), ("Delete",self.delete_watchlist), ("Import",lambda:self.import_data("watchlists")), ("Export",lambda:self.export("watchlists"))):
             actions.addWidget(button(text,cb,text.startswith("+")))
         layout.addLayout(actions)
         self.watchlist_table = Table([("NAME",lambda w:w["name"]), ("ENABLED",lambda w:w["enabled"]), ("PRIORITY",lambda w:w["priority"]),
             ("WEAPONS",lambda w:", ".join(w["weapons"]) or "All"), ("TYPE",lambda w:w["category"] or "All"),
-            ("FILTER",lambda w:json.dumps(w["filter"])), ("SOURCE",lambda w:"Contract API unavailable")])
+            ("FILTER",lambda w:json.dumps(w["filter"])), ("SOURCE",lambda w:"Legacy partial search (opt-in)")])
         self.selected_watchlist = None
         self.watchlist_table.selected.connect(lambda value:setattr(self,"selected_watchlist",value))
         layout.addWidget(self.watchlist_table)
@@ -200,7 +203,7 @@ class MainWindow(QMainWindow):
             dl.addWidget(button(text,callback))
         dl.addWidget(label("Restore requires confirmation and preserves the current database in a timestamped backup. Imports validate version and format. Watchlist imports create copies.","subtitle",True)); dl.addStretch()
         diagnostic=QWidget(); diag=QVBoxLayout(diagnostic); tabs.addTab(diagnostic,"Diagnostics & updates")
-        diag.addWidget(label(f"RivenScope {__version__}\nNative Qt / Wayland · SQLite · no telemetry\nContract API capability: unavailable\nUpdate source: not configured (no repository has been published)\nUpdate method: rebuild and run the local installer; user data is retained.","subtitle",True))
+        diag.addWidget(label(f"RivenScope {__version__}\nNative Qt / Wayland · SQLite · no telemetry\nContract API: experimental legacy v1 (opt-in)\nUpdate source: not configured\nUpdate method: rebuild and run the local installer; user data is retained.","subtitle",True))
         self.diagnostics=QTextBrowser(); diag.addWidget(self.diagnostics)
         diag.addWidget(button("Open local log directory",lambda:QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.locations["state"])))))
         diag.addWidget(button("Open Warframe Market rules ↗",lambda:QDesktopServices.openUrl(QUrl("https://docs.warframe.market/docs/rules/overview/"))))
@@ -219,6 +222,10 @@ class MainWindow(QMainWindow):
         self.metrics["weapons"].value.setText(str(len(data["weapons"])))
         self.metrics["watchlists"].value.setText(str(sum(w["enabled"] for w in data["watchlists"])))
         self.metrics["listings"].value.setText(str(summary["listings"])); self.metrics["new"].value.setText(str(summary["new"]))
+        mode = "enabled" if data["settings"]["legacy_contracts"] else "disabled"
+        searched = summary.get("searched_weapons",0)
+        self.banner.setText(f"Legacy searches {mode}. {CONTRACT_LIMITATION}")
+        self.coverage.setText(f"Recorded weapon searches: {searched}/{len(data['weapons'])} catalog entries · {summary['listings']} retained contracts\nResponses are partial; total market size and pagination are unknown. Unchecked weapons: {max(0,len(data['weapons'])-searched)}.\nAt 10 requests/minute a full catalog pass can take over {len(data['weapons'])/10:.0f} minutes. Search timestamps do not prove current listing availability.")
         self.last_update.setText(f"Last catalog update: {timestamp(summary['catalog_time'])}\nLast market update: {timestamp(summary['last_market_update'])}")
         self.paths_label.setText(f"Database: {data['database']}\nLogs: {self.locations['state']}\nInterface state: {self.locations['config']}\nSchema: 2 · Snapshots: {summary['snapshots']} · Retained notifications: {summary['notifications']}")
         self.diagnostics.setPlainText("Requests (most recent first)\n"+"\n".join(f"{timestamp(r['at'])}  {r['route']}  HTTP {r['status']}  {r['message']}" for r in summary["requests"]))
@@ -246,10 +253,10 @@ class MainWindow(QMainWindow):
 
     def scheduler_update(self, value):
         self.start_button.setEnabled(self.ready and not value["running"])
-        self.start_button.setText("Catalog sync active" if value["running"] else "Start catalog sync")
+        self.start_button.setText("Monitoring active" if value["running"] else "Start monitoring")
         self.stop_button.setEnabled(value["running"])
         self.metrics["budget"].value.setText(f"{value['remaining']} / 10")
-        text=f"{'Catalog sync active' if value['running'] else 'Stopped'} · {value['status']}\nActual HTTP starts in last minute: {value['requests_minute']} · Queue: {value['queued']} · Next allowed request in {value['wait']:.0f}s"
+        text=f"{'Monitoring active' if value['running'] else 'Stopped'} · {value['status']}\nActual HTTP starts in last minute: {value['requests_minute']} · Queue: {value['queued']} · Next allowed request in {value['wait']:.0f}s"
         self.scheduler_label.setText(text); self.statusBar().showMessage(value["status"])
 
     def start(self):
@@ -298,12 +305,12 @@ class MainWindow(QMainWindow):
 
     def market_loaded(self,rows):
         self.market_rows=rows; self.market_table.model.set_rows(rows)
-        self.market_count.setText(f"{len(rows)} matching rows in page {self.market_offset//10000+1} · 10,000 observations per page before local filtering")
+        self.market_count.setText(f"{len(rows)} matching rows in page {self.market_offset//MARKET_PAGE_SIZE+1} · {MARKET_PAGE_SIZE} observations per page before local filtering")
         deals=sum(row["estimate"].qualifies for row in rows); self.metrics["deals"].value.setText(str(deals) if rows else "—")
         self.metrics["deals"].detail.setText("Qualifying estimates on the current page" if rows else "Insufficient data · no contract source")
 
     def market_page(self,delta):
-        self.market_offset=max(0,self.market_offset+delta*10000); self.load_market()
+        self.market_offset=max(0,self.market_offset+delta*MARKET_PAGE_SIZE); self.load_market()
 
     def listing_selected(self,row):
         self.selected_listing=row; item=row["listing"]; result=row["estimate"]
@@ -369,8 +376,8 @@ class MainWindow(QMainWindow):
             low,high=min(prices),max(prices); width=max(1,(high-low)/15)
             bins=[(low+(i+.5)*width,sum(low+i*width<=p<low+(i+1)*width for p in prices)) for i in range(16)]
             oldest=min((t for t,_,_ in data["asking"]),default=None)
-            self.analytics_summary.setText(f"Sample: {len(prices)} current asks · median {statistics.median(prices):g}p · range {low:g}–{high:g}p\nOldest loaded observation: {timestamp(oldest)} · qualified estimates (all weapons): {data['qualified']}\nPlots bounded to 20,000 snapshots / 2,000 rendered points. This is not a sales history.")
-        else: self.analytics_summary.setText("Insufficient data. No price history exists in the local database. No synthetic history is generated.")
+            self.analytics_summary.setText(f"Sample: {len(prices)} fresh active asks (up to 10,000) · median {statistics.median(prices):g}p · range {low:g}–{high:g}p\nOldest loaded observation: {timestamp(oldest)} · qualified estimates in selection: {data['qualified']}\nPlots bounded to 20,000 snapshots / 2,000 rendered points. This is not a sales history.")
+        else: self.analytics_summary.setText("Insufficient current data. No fresh active asks match this selection. Historical observations, if available, remain in the plots. No synthetic history is generated.")
         self.charts["distribution"].set_points(bins,"Asking price (p) → · listing count")
 
     def test_notification(self):
@@ -437,7 +444,7 @@ class MainWindow(QMainWindow):
         self.ui_state.setValue("market_splitter",self.market_splitter.saveState())
         self.ui_state.setValue("market_filter",json.dumps(self.market_expression))
         for name in ("catalog","market","watchlist","notification"):
-            self.ui_state.setValue(name+"_header",getattr(self,name+"_table").view.horizontalHeader().saveState())
+            self.ui_state.setValue("market_header_v2" if name=="market" else name+"_header",getattr(self,name+"_table").view.horizontalHeader().saveState())
         self.ui_state.sync()
         self.channels.close()
         self.setEnabled(False); self.statusBar().showMessage("Stopping requests and flushing local data…")

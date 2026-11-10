@@ -1,3 +1,18 @@
+# Изменения 0.2.0
+
+`contracts.py` валидирует captured legacy WFM search и переводит его в канонические
+Listing/Attribute без предположений о raw roll context. Transport разрешает только
+фиксированный read-only search route; settings opt-in выключен по умолчанию.
+Worker планирует scope оружий/пресетов с persistent refresh timestamps, затем
+получение → полная валидация → partial observation engine → GUI. Никакие пропуски
+не трактуются как исчезновение. Details/таблица различают starting/top bids и buyout.
+Общий существующий scheduler budget остаётся 10/мин. История и schema version=2
+сохраняются; новые settings сливаются с defaults. При изменении настроек очередь
+останавливается, новый запуск делает пользователь. См. [READINESS_0.2.0](READINESS_0.2.0.md).
+Архитектурный отчёт ниже сохранён как история первоначальной реализации.
+
+---
+
 # Architecture decision
 
 ## Stack comparison on the actual host

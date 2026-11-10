@@ -5,7 +5,7 @@ from email.utils import parsedate_to_datetime
 import random
 import time
 from PySide6.QtCore import QObject, QTimer, Signal
-from .network import ROUTES
+from .network import request_path
 
 
 def retry_seconds(value, now):
@@ -129,7 +129,7 @@ class Scheduler(QObject):
         if self.running:
             return
         self.running = True
-        self.last_status = "Catalog sync enabled; contract monitoring unavailable"
+        self.last_status = "Monitoring enabled; legacy searches require explicit opt-in"
         self.timer.start()
         self.report()
 
@@ -144,8 +144,7 @@ class Scheduler(QObject):
         self.report()
 
     def enqueue(self, key, priority=3, consumer="global"):
-        if key not in ROUTES:
-            raise ValueError("Unsupported API capability")
+        request_path(key)
         if not self.running:
             return
         if self.active and self.active.key == key:
