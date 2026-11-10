@@ -1,0 +1,55 @@
+[
+  {
+    "url": "https://api.warframe.market/v2/versions",
+    "captured_at": "2026-11-09T15:51:56.147810+00:00",
+    "user_agent": "RivenScope/0.1.0 (Linux desktop; API feasibility investigation)",
+    "status": 200,
+    "bytes": 481,
+    "sha256": "156e9c1646249028d00f2d759f950c0eced52b5947e40bfcdacc5064a33cae3d",
+    "content_type": "application/json",
+    "api_version": "0.25.0",
+    "records": 1
+  },
+  {
+    "url": "https://api.warframe.market/v2/riven/weapons",
+    "captured_at": "2026-11-09T15:52:07.863599+00:00",
+    "user_agent": "RivenScope/0.1.0 (Linux desktop; API feasibility investigation)",
+    "status": 200,
+    "bytes": 164410,
+    "sha256": "18d0e7af72e6e8b8046bb483dbf2ed65e08d396ab02ec23eb3186f3097809f52",
+    "content_type": "application/json",
+    "api_version": "0.25.0",
+    "records": 420
+  },
+  {
+    "url": "https://api.warframe.market/v2/riven/attributes",
+    "captured_at": "2026-11-09T15:52:27.744109+00:00",
+    "user_agent": "RivenScope/0.1.0 (Linux desktop; API feasibility investigation)",
+    "status": 200,
+    "bytes": 15567,
+    "sha256": "2a1f77ace9eabf5064739a06582b6d85b9daa4ccb892ba8d6eceb7daa2c69c8e",
+    "content_type": "application/json",
+    "api_version": "0.25.0",
+    "records": 50
+  },
+  {
+    "url": "https://api.warframe.market/v2/riven/weapon/torid",
+    "captured_at": "2026-11-09T15:52:41.642653+00:00",
+    "user_agent": "RivenScope/0.1.0 (Linux desktop; API feasibility investigation)",
+    "status": 200,
+    "bytes": 401,
+    "sha256": "e32ab7c7bc0f389f8a96bff4e649842a28ebc81de58181097c2c42ef1cbd8532",
+    "content_type": "application/json",
+    "api_version": "0.25.0",
+    "records": 1
+  },
+  {
+    "url": "https://warframe.market/tos",
+    "captured_at": "2026-11-09T15:52:56.094933+00:00",
+    "user_agent": "RivenScope/0.1.0 (Linux desktop; API feasibility investigation)",
+    "status": 200,
+    "bytes": 285727,
+    "sha256": "2479ef7e560e854a1a235c16d0308ae49e290c4550658d26b4da778a4538b739",
+    "content_type": "text/html; charset=utf-8"
+  }
+]

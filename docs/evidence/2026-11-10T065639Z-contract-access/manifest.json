@@ -1,0 +1,97 @@
+{
+  "purpose": "Official source review; not proof that contract access exists or does not exist",
+  "sources": [
+    {
+      "source": "intro",
+      "url": "https://docs.warframe.market/docs/intro/",
+      "captured_at": "2026-11-10T06:56:39.361060+00:00",
+      "user_agent": "RivenScope/0.1.0 (Linux desktop; public contract API access research)",
+      "status": 200,
+      "file": "intro.html",
+      "bytes": 19770,
+      "sha256": "de099a6d92cb2e2e0d92f88d40d24dd4cda9f7dbf9f6cfbbf412065655f27090"
+    },
+    {
+      "source": "sitemap",
+      "url": "https://docs.warframe.market/sitemap.xml",
+      "captured_at": "2026-11-10T06:56:45.461130+00:00",
+      "user_agent": "RivenScope/0.1.0 (Linux desktop; public contract API access research)",
+      "status": 200,
+      "file": "sitemap.xml",
+      "bytes": 3814,
+      "sha256": "76f4f60c228aa6e8b28db6177595c416f8a280a9051746243a1119d64eb4181e"
+    },
+    {
+      "source": "subscriptions",
+      "url": "https://docs.warframe.market/docs/websockets/subscriptions/",
+      "captured_at": "2026-11-10T06:56:51.561238+00:00",
+      "user_agent": "RivenScope/0.1.0 (Linux desktop; public contract API access research)",
+      "status": 200,
+      "file": "subscriptions.html",
+      "bytes": 36787,
+      "sha256": "08d900dfdd60bf782c7ed5bb4e9833fceb2b78125ed1d58ce5b1f65b1b90f4bc"
+    },
+    {
+      "source": "oauth",
+      "url": "https://docs.warframe.market/docs/oauth/overview/",
+      "captured_at": "2026-11-10T06:56:57.661377+00:00",
+      "user_agent": "RivenScope/0.1.0 (Linux desktop; public contract API access research)",
+      "status": 200,
+      "file": "oauth.html",
+      "bytes": 16626,
+      "sha256": "1878d7db0199d6beaea1942ad9c77c8a0cc7e0116e539386984ee11f4ca608f7"
+    },
+    {
+      "source": "contributing",
+      "url": "https://docs.warframe.market/docs/contributing/wfm-docs/",
+      "captured_at": "2026-11-10T06:57:03.761487+00:00",
+      "user_agent": "RivenScope/0.1.0 (Linux desktop; public contract API access research)",
+      "status": 200,
+      "file": "contributing.html",
+      "bytes": 27967,
+      "sha256": "dd9c57adecb220896897f2d85eaf7e6a94075ed3db2cc96376d89801c81fc7ee"
+    },
+    {
+      "source": "electron_example",
+      "url": "https://docs.warframe.market/docs/contributing/wfm-electron/",
+      "captured_at": "2026-11-10T06:57:09.861621+00:00",
+      "user_agent": "RivenScope/0.1.0 (Linux desktop; public contract API access research)",
+      "status": 200,
+      "file": "electron_example.html",
+      "bytes": 26079,
+      "sha256": "daf9705ffd8b423b029ceeb3af9795dbcc06a86580864b06257c58b441d3fce6"
+    },
+    {
+      "source": "tos",
+      "url": "https://warframe.market/tos",
+      "captured_at": "2026-11-10T06:57:15.961721+00:00",
+      "user_agent": "RivenScope/0.1.0 (Linux desktop; public contract API access research)",
+      "status": 200,
+      "file": "tos.html",
+      "bytes": 285727,
+      "sha256": "c93f8753a591e38cfeb4a6e7e469a359c8c1f35ece0d5e9b33dd03353ba884e0"
+    },
+    {
+      "source": "official_docs_tree",
+      "url": "https://api.github.com/repos/42bytes-team/wfm-docs/git/trees/master?recursive=1",
+      "captured_at": "2026-11-10T06:57:22.061785+00:00",
+      "user_agent": "RivenScope/0.1.0 (Linux desktop; public contract API access research)",
+      "status": 200,
+      "file": "official_docs_tree.json",
+      "bytes": 34861,
+      "sha256": "c7fc28fbfd9a4fa2020d63195500239283280eff323781a8fd16f41c730f39cf",
+      "tree_sha": "c76d86937c0aabf6269b7f44f1d32761eeee3030",
+      "api_doc_paths": [
+        "docs/api/achievements.mdx",
+        "docs/api/authentication.mdx",
+        "docs/api/dashboard.mdx",
+        "docs/api/groups.mdx",
+        "docs/api/manifests.mdx",
+        "docs/api/orders.mdx",
+        "docs/api/overview.mdx",
+        "docs/api/users.mdx"
+      ]
+    }
+  ],
+  "automatic_capability_activation": false
+}
